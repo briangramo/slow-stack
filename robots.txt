@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://briangramo.github.io/slow-stack/sitemap.xml
