@@ -1,0 +1,61 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore image assets
+        run: |
+          python -m pip install --quiet pillow==12.3.0
+          curl -fsSL -o "$RUNNER_TEMP/Nunito.ttf" "https://github.com/google/fonts/raw/main/ofl/nunito/Nunito%5Bwght%5D.ttf"
+          python scripts/gen-icons.py
+          SLOW_STACK_FONT="$RUNNER_TEMP/Nunito.ttf" python scripts/gen-cover.py --og-only
+          sha256sum public/og.png public/apple-touch-icon.png public/favicon-32.png public/icons/*.png src/app/favicon.ico
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Lint
+        run: bun run lint
+        continue-on-error: true
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_BASE_PATH: /slow-stack
+          NEXT_PUBLIC_SITE_URL: https://briangramo.github.io/slow-stack
+        run: |
+          bun run build
+          touch out/.nojekyll
+
+      - name: Publish to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          publish_branch: gh-pages
+          force_orphan: true
